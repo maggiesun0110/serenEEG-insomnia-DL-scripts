@@ -1,0 +1,8 @@
+os
+numpy
+scipy
+matplotlib
+mne
+pandas
+scikit-learn
+pytorch
