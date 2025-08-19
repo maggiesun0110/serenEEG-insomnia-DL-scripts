@@ -1,3 +1,7 @@
+#bandpass
+#30s, 200Hz
+#normalize per epoch (z-score)
+   #normzlie = (og-mean)/sdd
 import os
 import numpy as np
 from scipy.io import loadmat
@@ -15,14 +19,20 @@ def preprocess(data, orig_sf, target_sf=200):
         data = resample(data, int(duration * target_sf))
     return data
 
+def normalize_epoch(epoch):
+    """Z-score normalize a 1D array."""
+    mean = np.mean(epoch)
+    std = np.std(epoch) + 1e-6  # prevent division by zero
+    return (epoch - mean) / std
+
 # === Config ===
-BASE_PATH = os.path.join("..", "..", "..", "data", "ISRUC sleep", "data")
+BASE_PATH = "/Users/maggiesun/downloads/research/sereneeg/data/ISRUC sleep/data"
 RESULTS_PATH = os.path.join("..", "..", "results")
 CHANNELS = ["F4_A1", "C4_A1", "O2_A1"]
 EPOCH_LEN = 30  
 SF_TARGET = 200
 EPOCH_SAMPLES = EPOCH_LEN * SF_TARGET
-OUTFILE = os.path.join(RESULTS_PATH, "isruc_raw_1dcnn.npz")
+OUTFILE = os.path.join(RESULTS_PATH, "isruc_raw.npz")
 
 X, y, subject_ids = [], [], []
 
@@ -63,9 +73,9 @@ for subj in sorted(os.listdir(BASE_PATH)):
     # Epoching
     epoch_arrays = [sig[:n_epochs * EPOCH_SAMPLES].reshape(n_epochs, EPOCH_SAMPLES) for sig in preprocessed]
 
-    # Stack channels per epoch
+    # Stack channels per epoch and normalize each channel
     for i in range(n_epochs):
-        epoch = np.stack([epoch_arrays[ch][i] for ch in range(len(CHANNELS))], axis=0)  # shape: (channels, samples)
+        epoch = np.stack([normalize_epoch(epoch_arrays[ch][i]) for ch in range(len(CHANNELS))], axis=0)
         X.append(epoch)
         y.append(1)  # change label accordingly
         subject_ids.append(subj)
