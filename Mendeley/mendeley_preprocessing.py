@@ -21,7 +21,7 @@ CHANNELS = ["F4A1", "C4A1", "O2A1"]
 SF_TARGET = 200
 EPOCH_LEN = 30  # seconds
 EPOCH_SAMPLES = SF_TARGET * EPOCH_LEN
-RESULTS_PATH = os.path.join("..", "..", "results")
+RESULTS_PATH = os.path.join("..", "dl_ins_results")
 OUTFILE = os.path.join(RESULTS_PATH, "mendeley_raw.npz")
 
 X, y, subject_ids = [], [], []
