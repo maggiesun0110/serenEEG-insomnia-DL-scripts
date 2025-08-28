@@ -26,7 +26,7 @@ def normalize_epoch(epoch):
     return (epoch - mean) / std
 
 # === Config ===
-BASE_PATH = "/Users/maggiesun/downloads/research/sereneeg/data/ISRUC sleep/data"
+BASE_PATH = "/Volumes/ORICO/serenEEG/data/ISRUC Sleep/data"
 RESULTS_PATH = os.path.join("..", "dl_ins_results")
 CHANNELS = ["F4_A1", "C4_A1", "O2_A1"]
 EPOCH_LEN = 30  

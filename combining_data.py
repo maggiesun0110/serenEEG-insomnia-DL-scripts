@@ -3,15 +3,15 @@ import numpy as np
 
 # === Paths to your preprocessed datasets ===
 datasets = {
-    "capsleep": "/Users/maggiesun/downloads/research/sereneeg/dl_ins/dl_ins_results/capsleep_raw.npz",
-    "isruc": "/Users/maggiesun/downloads/research/sereneeg/dl_ins/dl_ins_results/isruc_raw.npz",
-    "mendeley": "/Users/maggiesun/downloads/research/sereneeg/dl_ins/dl_ins_results/mendeley_raw.npz"
+    "capsleep": "/Volumes/ORICO/serenEEG/dl_ins/dl_ins_results/capsleep_raw.npz",
+    "isruc": "/Volumes/ORICO/serenEEG/dl_ins/dl_ins_results/isruc_raw.npz",
+    "mendeley": "/Volumes/ORICO/serenEEG/dl_ins/dl_ins_results/mendeley_raw.npz"
 }
 
 TARGET_CHANNELS = 3  # F4-A1, C4-A1, O2-A1
 
 # --- Prepare combined .npz storage ---
-output_path = "/Users/maggiesun/downloads/research/sereneeg/dl_ins/dl_ins_results/combined_raw.npz"
+output_path = "/Volumes/ORICO/serenEEG/dl_ins/dl_ins_results/combined_raw.npz"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
 X_list = []

@@ -28,7 +28,7 @@ def normalize_epoch(epoch):
     return (epoch - mean) / std
 
 # === Config ===
-BASE_PATH = "/Users/maggiesun/downloads/research/serenEEG/data/CapSleep"
+BASE_PATH = "/Volumes/ORICO/serenEEG/data/CapSleep"
 RESULTS_PATH = os.path.join("..", "dl_ins_results")
 CHANNELS_RAW = ["F4-C4", "C4-A1"]  
 TARGET_CHANNELS = ["F4-A1", "C4-A1"]  # final channels

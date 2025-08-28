@@ -22,7 +22,7 @@ def normalize_epoch(epoch):
     return (epoch - mean) / std
 
 # === Config ===
-BASE_PATH = "/Users/maggiesun/downloads/research/sereneeg/data/mendeley"
+BASE_PATH = "/Volumes/ORICO/serenEEG/data/mendeley"
 CHANNELS = ["F4A1", "C4A1", "O2A1"]   # must match names in EDF files
 SF_TARGET = 200
 EPOCH_LEN = 30  # seconds
