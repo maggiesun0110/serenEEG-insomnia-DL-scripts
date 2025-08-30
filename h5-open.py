@@ -1,56 +1,48 @@
-import os
-import h5py
 import numpy as np
 
-def load_h5(filepath):
-    with h5py.File(filepath, 'r') as f:
-        X = np.array(f['X'])
-        y = np.array(f['y'])
-    return X, y
+def load_combined_raw(npz_path):
+    """
+    Safely load 'raw_X', 'labels', and 'subject_ids' from a .npz file.
+    Returns a tuple: (raw_X, labels, subject_ids)
+    """
+    try:
+        data = np.load(npz_path, allow_pickle=True)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {npz_path}")
+    
+    print(f"Keys in the npz file: {data.files}")
+    
+    # Try loading directly
+    keys_to_find = ['raw_X', 'labels', 'subject_ids']
+    loaded = {}
+    for key in keys_to_find:
+        if key in data:
+            loaded[key] = data[key]
+    
+    # If any key is missing, maybe it's stored inside a dict
+    missing_keys = [k for k in keys_to_find if k not in loaded]
+    if missing_keys:
+        # Try checking if there is only one item which is a dict
+        if len(data.files) == 1:
+            first_key = data.files[0]
+            possible_dict = data[first_key].item() if hasattr(data[first_key], "item") else None
+            if isinstance(possible_dict, dict):
+                for k in missing_keys:
+                    if k in possible_dict:
+                        loaded[k] = possible_dict[k]
+    
+    # Final check
+    for k in keys_to_find:
+        if k not in loaded:
+            raise KeyError(f"Could not find key '{k}' in the npz file or inside a dict.")
+    
+    return loaded['raw_X'], loaded['labels'], loaded['subject_ids']
 
-def combine_h5(folder, output_file="combined.h5"):
-    X_list, y_list = [], []
-    channel_orders = []
-
-    for file in sorted(os.listdir(folder)):
-        if file.endswith(".h5"):
-            path = os.path.join(folder, file)
-            X, y = load_h5(path)
-
-            print(f"{file}: X={X.shape}, y={y.shape}")
-
-            if X.size == 0 or y.size == 0:
-                print(f"⚠️ Skipping empty file: {file}")
-                continue
-
-            X_list.append(X)
-            y_list.append(y)
-
-            # Record channel/feature dimensions
-            channel_orders.append(X.shape[1:])
-
-    if not X_list:
-        raise ValueError("❌ No valid data found in folder.")
-
-    # Check consistency of channels/features
-    if len(set(channel_orders)) != 1:
-        print("⚠️ Inconsistent channel/features across datasets:")
-        print(channel_orders)
-        raise ValueError("Mismatch in channel/features order")
-
-    # Concatenate
-    X_all = np.concatenate(X_list, axis=0)
-    y_all = np.concatenate(y_list, axis=0)
-
-    # Save combined
-    with h5py.File(output_file, "w") as f:
-        f.create_dataset("X", data=X_all)
-        f.create_dataset("y", data=y_all)
-
-    print(f"\n✅ Combined shape: X={X_all.shape}, y={y_all.shape}")
-    print("Label distribution:", {label: np.sum(y_all == label) for label in np.unique(y_all)})
-
-    return X_all, y_all
 
 if __name__ == "__main__":
-    combine_h5("/Users/maggiesun/Downloads/research/SerenEEG/dl_ins/dl_ins_results/h5_data")
+    npz_file = "../dl_ins_results/combined_raw.npz"  # replace with your path
+    raw_X, labels, subject_ids = load_combined_raw(npz_file)
+    print("Data loaded successfully!")
+    print(f"raw_X shape: {raw_X.shape}")
+    print(f"labels shape: {labels.shape}")
+    print(f"subject_ids shape: {subject_ids.shape}")
