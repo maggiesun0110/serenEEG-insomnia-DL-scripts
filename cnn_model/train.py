@@ -116,7 +116,7 @@ class RobustEEGCNN(nn.Module):
         return x
 
 # -------------------------------
-# 5b. Training & loss + accuracy tracking
+# 5b. Training & loss + accuracy tracking with per-subject plots
 # -------------------------------
 def train_model(model, train_loader, test_loader, test_subject_ids, device, epochs=10, lr=1e-3):
     criterion = nn.CrossEntropyLoss()
@@ -124,7 +124,12 @@ def train_model(model, train_loader, test_loader, test_subject_ids, device, epoc
     
     train_losses = []
     test_accuracies = []
-    
+    per_subject_acc_history = {}  # To store per-subject accuracies per epoch
+
+    unique_subjects = np.unique(test_subject_ids)
+    for subj in unique_subjects:
+        per_subject_acc_history[subj] = []
+
     for epoch in range(epochs):
         # ----------------- Training -----------------
         model.train()
@@ -158,11 +163,12 @@ def train_model(model, train_loader, test_loader, test_subject_ids, device, epoc
         test_accuracies.append(overall_acc)
         
         # Per-subject accuracy
-        unique_subjects = np.unique(test_subject_ids)
         subject_accs = {}
         for subj in unique_subjects:
             mask = test_subject_ids == subj
-            subject_accs[subj] = (all_preds[mask] == all_labels[mask]).mean()
+            acc = (all_preds[mask] == all_labels[mask]).mean()
+            subject_accs[subj] = acc
+            per_subject_acc_history[subj].append(acc)
         
         print(f"Epoch {epoch+1}/{epochs}: Train Loss={avg_train_loss:.4f}, Overall Test Acc={overall_acc:.4f}")
         print(f"Per-subject test accuracy (first 5 subjects): {dict(list(subject_accs.items())[:5])}")
@@ -170,22 +176,32 @@ def train_model(model, train_loader, test_loader, test_subject_ids, device, epoc
     # ----------------- Plotting -----------------
     epochs_range = range(1, epochs+1)
     
-    plt.figure(figsize=(10,4))
+    plt.figure(figsize=(16,5))
     
     # Training loss
-    plt.subplot(1,2,1)
+    plt.subplot(1,3,1)
     plt.plot(epochs_range, train_losses, marker='o', color='blue')
     plt.xlabel("Epoch")
     plt.ylabel("Train Loss")
     plt.title("Training Loss Curve")
     plt.grid(True)
     
-    # Test accuracy
-    plt.subplot(1,2,2)
+    # Overall test accuracy
+    plt.subplot(1,3,2)
     plt.plot(epochs_range, test_accuracies, marker='o', color='green')
     plt.xlabel("Epoch")
     plt.ylabel("Test Accuracy")
-    plt.title("Test Accuracy Curve")
+    plt.title("Overall Test Accuracy Curve")
+    plt.grid(True)
+    
+    # Per-subject accuracy
+    plt.subplot(1,3,3)
+    for subj in unique_subjects:
+        plt.plot(epochs_range, per_subject_acc_history[subj], label=f"Subj {subj}")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Per-Subject Test Accuracy")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
     plt.grid(True)
     
     plt.tight_layout()
