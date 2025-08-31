@@ -7,3 +7,4 @@ scikit-learn
 torch
 joblib
 h5py
+tensorboard
