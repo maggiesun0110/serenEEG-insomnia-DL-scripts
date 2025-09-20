@@ -4,7 +4,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score
 import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
+import datetime
 
 # -------------------------------
 # 1. Load EEG data
@@ -121,8 +124,17 @@ class RobustEEGCNN(nn.Module):
 # -------------------------------
 from sklearn.utils.class_weight import compute_class_weight
 
+from sklearn.metrics import precision_score, recall_score
+from sklearn.utils.class_weight import compute_class_weight
+from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn as nn
+import datetime
+
 def train_model(model, train_loader, test_loader, test_subject_ids, y_train, device, epochs=10, lr=1e-3):
-    # Compute class weights
+    # ----------------- Class weights -----------------
     classes = np.unique(y_train)
     class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train)
     class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
@@ -130,7 +142,7 @@ def train_model(model, train_loader, test_loader, test_subject_ids, y_train, dev
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    
+
     train_losses = []
     test_accuracies = []
     per_subject_acc_history = {}
@@ -139,6 +151,11 @@ def train_model(model, train_loader, test_loader, test_subject_ids, y_train, dev
     for subj in unique_subjects:
         per_subject_acc_history[subj] = []
 
+    # ----------------- TensorBoard setup -----------------
+    run_name = f"cnn2layer_epochs{epochs}_bs{train_loader.batch_size}_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    writer = SummaryWriter(log_dir=f"runs/eeg_experiment/{run_name}")
+    print(f"TensorBoard logs will be saved to: runs/eeg_experiment/{run_name}")
+
     for epoch in range(epochs):
         # ----------------- Training -----------------
         model.train()
@@ -146,14 +163,14 @@ def train_model(model, train_loader, test_loader, test_subject_ids, y_train, dev
         for X_batch, y_batch in train_loader:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
             optimizer.zero_grad()
-            output = model(X_batch)
-            loss = criterion(output, y_batch)
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
         avg_train_loss = train_loss / len(train_loader)
         train_losses.append(avg_train_loss)
-        
+
         # ----------------- Evaluation -----------------
         model.eval()
         all_preds, all_labels = [], []
@@ -166,10 +183,13 @@ def train_model(model, train_loader, test_loader, test_subject_ids, y_train, dev
                 all_labels.append(y_batch.cpu().numpy())
         all_preds = np.concatenate(all_preds)
         all_labels = np.concatenate(all_labels)
-        
+
+        # Overall metrics
         overall_acc = (all_preds == all_labels).mean()
+        precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+        recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
         test_accuracies.append(overall_acc)
-        
+
         # Per-subject accuracy
         subject_accs = {}
         for subj in unique_subjects:
@@ -177,43 +197,44 @@ def train_model(model, train_loader, test_loader, test_subject_ids, y_train, dev
             acc = (all_preds[mask] == all_labels[mask]).mean()
             subject_accs[subj] = acc
             per_subject_acc_history[subj].append(acc)
-        
-        print(f"Epoch {epoch+1}/{epochs}: Train Loss={avg_train_loss:.4f}, Overall Test Acc={overall_acc:.4f}")
-        print(f"Per-subject test accuracy (first 5 subjects): {dict(list(subject_accs.items())[:5])}")
-    
+
+        # ----------------- TensorBoard Logging -----------------
+        writer.add_scalar("Loss/train", avg_train_loss, epoch)
+        writer.add_scalar("Accuracy/test", overall_acc, epoch)
+        writer.add_scalar("Precision/test", precision, epoch)
+        writer.add_scalar("Recall/test", recall, epoch)
+        for subj in unique_subjects:
+            writer.add_scalar(f"Accuracy/subject_{subj}", subject_accs[subj], epoch)
+        writer.flush()
+
+        # ----------------- Print -----------------
+        print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_train_loss:.4f} | "
+              f"Test Acc: {overall_acc:.4f} | Precision: {precision:.4f} | Recall: {recall:.4f}")
+        print(f"Per-subject accuracy (first 5 subjects): {dict(list(subject_accs.items())[:5])}")
+
     # ----------------- Plotting -----------------
     epochs_range = range(1, epochs+1)
-    
     plt.figure(figsize=(16,5))
-    
+
     # Training loss
     plt.subplot(1,3,1)
     plt.plot(epochs_range, train_losses, marker='o', color='blue')
-    plt.xlabel("Epoch")
-    plt.ylabel("Train Loss")
-    plt.title("Training Loss Curve")
-    plt.grid(True)
-    
+    plt.xlabel("Epoch"); plt.ylabel("Train Loss"); plt.title("Training Loss Curve"); plt.grid(True)
+
     # Overall test accuracy
     plt.subplot(1,3,2)
     plt.plot(epochs_range, test_accuracies, marker='o', color='green')
-    plt.xlabel("Epoch")
-    plt.ylabel("Test Accuracy")
-    plt.title("Overall Test Accuracy Curve")
-    plt.grid(True)
-    
+    plt.xlabel("Epoch"); plt.ylabel("Test Accuracy"); plt.title("Overall Test Accuracy Curve"); plt.grid(True)
+
     # Per-subject accuracy
     plt.subplot(1,3,3)
     for subj in unique_subjects:
         plt.plot(epochs_range, per_subject_acc_history[subj], label=f"Subj {subj}")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.title("Per-Subject Test Accuracy")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.show()
+    plt.xlabel("Epoch"); plt.ylabel("Accuracy"); plt.title("Per-Subject Test Accuracy")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8); plt.grid(True)
+
+    plt.tight_layout(); plt.show()
+    writer.close()
 
 # -------------------------------
 # 6. Main
