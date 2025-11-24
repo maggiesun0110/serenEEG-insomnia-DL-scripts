@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
@@ -74,7 +75,7 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"baseline_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"baseline_with_precrecf1_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -94,23 +95,34 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3):
 
         # ---------- Evaluate ----------
         model.eval()
-        correct = 0
-        total = 0
+        all_preds = []
+        all_labels = []
         with torch.no_grad():
             for Xb, yb in test_loader:
                 Xb, yb = Xb.to(device), yb.to(device)
                 out = model(Xb)
                 _, pred = torch.max(out, 1)
-                correct += (pred == yb).sum().item()
-                total += yb.size(0)
+                all_preds.append(pred.cpu().numpy())
+                all_labels.append(yb.cpu().numpy())
 
-        test_acc = correct / total
+        all_preds = np.concatenate(all_preds)
+        all_labels = np.concatenate(all_labels)
+        test_acc = (all_preds == all_labels).mean()
+        precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, labels = np.unique(all_labels), zero_division=0)
 
+        cm = confusion_matrix(all_labels, all_preds)
         # TensorBoard logs
         writer.add_scalar("Loss/train", avg_loss, epoch)
         writer.add_scalar("Accuracy/test", test_acc, epoch)
+        writer.add_scalar("Precision/test", np.mean(precision), epoch)
+        writer.add_scalar("Recall/test", np.mean(recall), epoch)
+        writer.add_scalar("F1_macro/test", np.mean(f1), epoch)
 
         print(f"Epoch {epoch+1}/{epochs} | Loss: {avg_loss:.4f} | Test Acc: {test_acc:.4f}")
+        print(f"  Precision per class: {precision}")
+        print(f"  Recall per class:    {recall}")
+        print(f"  F1 per class:        {f1}")
+        print(f"  Confusion matrix:\n{cm}")
 
     writer.close()
 
