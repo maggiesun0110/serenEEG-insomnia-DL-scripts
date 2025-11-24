@@ -70,6 +70,7 @@ class BaseEEGCNN(nn.Module):
         x = self.relu(self.fc1(x))
         return self.fc2(x)
 
+
 # 5. Minimal training loop
 def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights=None):
     
@@ -82,7 +83,7 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"baseline+weights_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"weights+oversampling_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -148,7 +149,15 @@ if __name__ == "__main__":
     train_dataset = EEGDataset(X_train, y_train)
     test_dataset  = EEGDataset(X_test, y_test)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    class_sample_counts = np.bincount(y_train)
+    print("class sample counts: ", class_sample_counts)
+
+    weights_per_class = 1.0/class_sample_counts
+    weights = weights_per_class[y_train]
+
+    sampler = torch.utils.data.WeightedRandomSampler(weights = weights, num_samples = len(weights), replacement = True)
+
+    train_loader = DataLoader(train_dataset, batch_size=32, sampler = sampler)
     test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
