@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
+from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
@@ -70,12 +71,18 @@ class BaseEEGCNN(nn.Module):
         return self.fc2(x)
 
 # 5. Minimal training loop
-def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3):
-    criterion = nn.CrossEntropyLoss()
+def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights=None):
+    
+    if class_weights is not None:
+        weight_tensor = torch.tensor(class_weights, dtype = torch.float32).to(device)
+        # punishes mistakes on minority class 25x more
+        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+    else:
+        criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"baseline_with_precrecf1_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"baseline+weights_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -133,6 +140,11 @@ if __name__ == "__main__":
 
     X_train, y_train, X_test, y_test = split_subjects(raw_X, labels, subject_ids)
 
+    classes = np.unique(y_train)
+    class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train)
+    print("Class weights:", dict(zip(classes, class_weights)))
+    # will print {0:25.4, 1:1.0} so minority gets multiplied 25x in the loss
+
     train_dataset = EEGDataset(X_train, y_train)
     test_dataset  = EEGDataset(X_test, y_test)
 
@@ -144,6 +156,6 @@ if __name__ == "__main__":
 
     model = BaseEEGCNN(num_classes=len(np.unique(labels))).to(device)
 
-    train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3)
+    train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights = class_weights)
 
     print("Done!")
