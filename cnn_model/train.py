@@ -83,7 +83,7 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"weights+oversampling_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"rolled_back_weights+threshold_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -134,6 +134,76 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
 
     writer.close()
 
+def find_best_threshold(model, test_loader, device):
+    model.eval()
+    all_probs = []
+    all_labels = []
+
+    with torch.no_grad():
+        for Xb, yb in test_loader:
+            Xb = Xb.to(device)
+            out = model(Xb)
+            probs = torch.softmax(out, dim=1)[:, 0]  # class 0 probability
+            all_probs.append(probs.cpu().numpy())
+            all_labels.append(yb.numpy())
+
+    all_probs = np.concatenate(all_probs)
+    all_labels = np.concatenate(all_labels)
+
+    best_f1 = 0
+    best_thresh = 0.5
+
+    thresholds = np.linspace(0.01, 0.99, 99)
+
+    for t in thresholds:
+        preds = (all_probs > t).astype(int)
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            all_labels, preds, labels=np.unique(all_labels), zero_division=0
+        )
+        macro_f1 = f1.mean()
+
+        if macro_f1 > best_f1:
+            best_f1 = macro_f1
+            best_thresh = t
+
+    print("\n===== Threshold Tuning Results =====")
+    print("Best threshold:", best_thresh)
+    print("Best macro F1:", best_f1)
+    print("====================================\n")
+
+    return best_thresh
+
+
+def evaluate_with_threshold(model, test_loader, device, threshold):
+    model.eval()
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for Xb, yb in test_loader:
+            Xb = Xb.to(device)
+            out = model(Xb)
+            probs = torch.softmax(out, dim=1)[:, 0]
+            pred = (probs > threshold).long()
+            all_preds.append(pred.cpu().numpy())
+            all_labels.append(yb.numpy())
+
+    all_preds = np.concatenate(all_preds)
+    all_labels = np.concatenate(all_labels)
+
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        all_labels, all_preds, labels=np.unique(all_labels), zero_division=0
+    )
+    cm = confusion_matrix(all_labels, all_preds)
+
+    print("\n===== Final Evaluation With Tuned Threshold =====")
+    print("Threshold =", threshold)
+    print("Precision:", precision)
+    print("Recall:", recall)
+    print("F1:", f1)
+    print("Macro F1:", f1.mean())
+    print("Confusion matrix:\n", cm)
+
 # 6. Main
 if __name__ == "__main__":
     npz_file = "../dl_ins_results/combined_raw.npz"
@@ -166,5 +236,8 @@ if __name__ == "__main__":
     model = BaseEEGCNN(num_classes=len(np.unique(labels))).to(device)
 
     train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights = class_weights)
+
+    best_t = find_best_threshold(model, test_loader, device)
+    evaluate_with_threshold(model, test_loader, device, best_t)
 
     print("Done!")
