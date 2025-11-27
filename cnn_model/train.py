@@ -71,7 +71,7 @@ class BaseEEGCNN(nn.Module):
         self.dropout = nn.Dropout(0.5)
         
         self.fc1 = nn.Linear(128, 64)
-        self.fc2 = nn.Linear(64, num_classes)
+        self.fc2 = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
 
@@ -95,13 +95,14 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
     if class_weights is not None:
         weight_tensor = torch.tensor(class_weights, dtype = torch.float32).to(device)
         # punishes mistakes on minority class 25x more
-        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+        pos_weight_tensor = torch.tensor([class_weights[0] / class_weights[1]], dtype=torch.float32).to(device)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"deeper_model_from_rollback_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"deeper+sigmoid_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -112,7 +113,7 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
             Xb, yb = Xb.to(device), yb.to(device)
             optimizer.zero_grad()
             out = model(Xb)
-            loss = criterion(out, yb)
+            loss = criterion(out.squeeze(1), yb.float())
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
@@ -127,7 +128,8 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
             for Xb, yb in test_loader:
                 Xb, yb = Xb.to(device), yb.to(device)
                 out = model(Xb)
-                _, pred = torch.max(out, 1)
+                probs = torch.sigmoid(out).squeeze(1)
+                pred = (probs > 0.5).long()
                 all_preds.append(pred.cpu().numpy())
                 all_labels.append(yb.cpu().numpy())
 
@@ -161,7 +163,7 @@ def find_best_threshold(model, test_loader, device):
         for Xb, yb in test_loader:
             Xb = Xb.to(device)
             out = model(Xb)
-            probs = torch.softmax(out, dim=1)[:, 0]  # class 0 probability
+            probs = torch.sigmoid(out).squeeze(1)
             all_probs.append(probs.cpu().numpy())
             all_labels.append(yb.numpy())
 
@@ -201,7 +203,7 @@ def evaluate_with_threshold(model, test_loader, device, threshold):
         for Xb, yb in test_loader:
             Xb = Xb.to(device)
             out = model(Xb)
-            probs = torch.softmax(out, dim=1)[:, 0]
+            probs = torch.sigmoid(out).squeeze(1)
             pred = (probs > threshold).long()
             all_preds.append(pred.cpu().numpy())
             all_labels.append(yb.numpy())
