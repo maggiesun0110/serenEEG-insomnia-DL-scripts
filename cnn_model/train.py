@@ -88,7 +88,28 @@ class BaseEEGCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+class BinaryFocalLoss(nn.Module):
+    def __init__(self, alpha = 1.0, gamma = 2.0, reduction = "mean"):
+        super(BinaryFocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+    
+    def forward(self, logits, targets):
+        logits = logits.squeeze(1)
 
+        bce = nn.functional.binary_cross_entropy_with_logits(logits, targets.float(), reduction = "none")
+        probs = torch.sigmoid(logits)
+        pt = torch.where(targets == 1, probs, 1 - probs)
+
+        focal_weight = (1-pt)**self.gamma
+        loss = self.alpha * focal_weight * bce
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        return loss
 # 5. Minimal training loop
 def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights=None):
     
@@ -96,13 +117,13 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
         weight_tensor = torch.tensor(class_weights, dtype = torch.float32).to(device)
         # punishes mistakes on minority class 25x more
         pos_weight_tensor = torch.tensor([class_weights[0] / class_weights[1]], dtype=torch.float32).to(device)
-        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+        criterion = BinaryFocalLoss(alpha=class_weights[0]/class_weights[1], gamma=2.0)
     else:
         criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     #NEW CLEAN TENSORBOARD RUN
-    run_name = f"deeper+sigmoid_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"sigmoid+focal_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     for epoch in range(epochs):
@@ -113,7 +134,7 @@ def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, 
             Xb, yb = Xb.to(device), yb.to(device)
             optimizer.zero_grad()
             out = model(Xb)
-            loss = criterion(out.squeeze(1), yb.float())
+            loss = criterion(out, yb.float())
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
