@@ -111,69 +111,116 @@ class BinaryFocalLoss(nn.Module):
             return loss.sum()
         return loss
 # 5. Minimal training loop
-def train_minimal(model, train_loader, test_loader, device, epochs=10, lr=1e-3, class_weights=None):
-    
+def train_minimal(model, train_loader, test_loader, device,
+                  epochs=50, lr=1e-3, class_weights=None, patience=5):
+    # ----- Choose loss function ----
     if class_weights is not None:
-        weight_tensor = torch.tensor(class_weights, dtype = torch.float32).to(device)
-        # punishes mistakes on minority class 25x more
-        pos_weight_tensor = torch.tensor([class_weights[0] / class_weights[1]], dtype=torch.float32).to(device)
-        criterion = BinaryFocalLoss(alpha=class_weights[0]/class_weights[1], gamma=2.0)
+        # minority has index 0
+        alpha = class_weights[0] / class_weights[1]
+        criterion = BinaryFocalLoss(alpha=alpha, gamma=2.0)
     else:
         criterion = nn.BCEWithLogitsLoss()
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    #NEW CLEAN TENSORBOARD RUN
-    run_name = f"sigmoid+focal_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    # ----- TensorBoard -----
+    run_name = f"early_stopping_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
+    # ----- Early stopping state -----
+    best_macro_f1 = 0.0
+    best_state_dict = None
+    epochs_no_improve = 0
+
+    # ----- Epoch loop -----
     for epoch in range(epochs):
         model.train()
-        total_loss = 0
+        total_loss = 0.0
 
+        # Training loop
         for Xb, yb in train_loader:
             Xb, yb = Xb.to(device), yb.to(device)
+
             optimizer.zero_grad()
             out = model(Xb)
             loss = criterion(out, yb.float())
             loss.backward()
             optimizer.step()
+
             total_loss += loss.item()
 
         avg_loss = total_loss / len(train_loader)
 
-        # ---------- Evaluate ----------
+        # -------- Evaluation --------
         model.eval()
         all_preds = []
         all_labels = []
+
         with torch.no_grad():
             for Xb, yb in test_loader:
                 Xb, yb = Xb.to(device), yb.to(device)
+
                 out = model(Xb)
                 probs = torch.sigmoid(out).squeeze(1)
                 pred = (probs > 0.5).long()
+
                 all_preds.append(pred.cpu().numpy())
                 all_labels.append(yb.cpu().numpy())
 
         all_preds = np.concatenate(all_preds)
         all_labels = np.concatenate(all_labels)
+
         test_acc = (all_preds == all_labels).mean()
-        precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, labels = np.unique(all_labels), zero_division=0)
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            all_labels, all_preds,
+            labels=np.unique(all_labels),
+            zero_division=0
+        )
+
+        macro_precision = precision.mean()
+        macro_recall = recall.mean()
+        macro_f1 = f1.mean()
 
         cm = confusion_matrix(all_labels, all_preds)
-        # TensorBoard logs
+
+        # ----- TensorBoard -----
         writer.add_scalar("Loss/train", avg_loss, epoch)
         writer.add_scalar("Accuracy/test", test_acc, epoch)
-        writer.add_scalar("Precision/test", np.mean(precision), epoch)
-        writer.add_scalar("Recall/test", np.mean(recall), epoch)
-        writer.add_scalar("F1_macro/test", np.mean(f1), epoch)
+        writer.add_scalar("Precision/test", macro_precision, epoch)
+        writer.add_scalar("Recall/test", macro_recall, epoch)
+        writer.add_scalar("F1_macro/test", macro_f1, epoch)
+        writer.add_scalar("F1_minority/test", f1[0], epoch)
 
-        print(f"Epoch {epoch+1}/{epochs} | Loss: {avg_loss:.4f} | Test Acc: {test_acc:.4f}")
-        print(f"  Precision per class: {precision}")
-        print(f"  Recall per class:    {recall}")
-        print(f"  F1 per class:        {f1}")
-        print(f"  Confusion matrix:\n{cm}")
+        # ----- Console output -----
+        print(f"\nEpoch {epoch+1}/{epochs} | Loss: {avg_loss:.4f} | Acc: {test_acc:.4f}")
+        print(f"  Precision: {precision}")
+        print(f"  Recall:    {recall}")
+        print(f"  F1:        {f1}")
+        print(f"  Macro F1:  {macro_f1:.4f}")
+        print(f"  CM:\n{cm}")
+
+        # ----- Early stopping logic -----
+        if macro_f1 > best_macro_f1 + 1e-4:
+            best_macro_f1 = macro_f1
+            best_state_dict = model.state_dict()
+            epochs_no_improve = 0
+            print(f"  New BEST macro F1 = {macro_f1:.4f} (model saved)")
+        else:
+            epochs_no_improve += 1
+            print(f"  No improvement for {epochs_no_improve} epochs.")
+
+            if epochs_no_improve >= patience:
+                print("\n*** Early stopping triggered ***")
+                break
 
     writer.close()
+
+    # ----- Restore best model -----
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+        print(f"\nLoaded best model (macro F1 = {best_macro_f1:.4f})")
+
+    return model
 
 def find_best_threshold(model, test_loader, device):
     model.eval()
