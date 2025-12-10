@@ -36,7 +36,7 @@ X, y, subject_ids = [], [], []
 for label_folder, label in [("normal", 0), ("insomnia", 1)]:
     folder_path = os.path.join(BASE_PATH, label_folder)
     if not os.path.exists(folder_path):
-        print(f"❌ Folder not found: {folder_path}")
+        print(f"Folder not found: {folder_path}")
         continue
 
     for file in os.listdir(folder_path):
@@ -49,14 +49,14 @@ for label_folder, label in [("normal", 0), ("insomnia", 1)]:
         try:
             raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
         except Exception as e:
-            print(f"❌ Failed to load {file}: {e}")
+            print(f"Failed to load {file}: {e}")
             continue
 
         orig_sf = int(raw.info["sfreq"])
         try:
             raw.pick_channels(CHANNELS)
         except Exception as e:
-            print(f"⚠️ Missing channels in {file}: {e}")
+            print(f"Missing channels in {file}: {e}")
             continue
 
         data = raw.get_data()
@@ -66,7 +66,7 @@ for label_folder, label in [("normal", 0), ("insomnia", 1)]:
         min_len = min(len(ch) for ch in preprocessed)
         n_epochs = min_len // EPOCH_SAMPLES
         if n_epochs == 0:
-            print("⚠️ Too short for 30s epochs:", file_path)
+            print("Too short for 30s epochs:", file_path)
             continue
 
         # Epoching and normalization
@@ -85,5 +85,5 @@ subject_ids = np.array(subject_ids)
 os.makedirs(RESULTS_PATH, exist_ok=True)
 np.savez(OUTFILE, raw_X=X, labels=y, subject_ids=subject_ids)
 
-print("✅ Saved:", OUTFILE)
+print("Saved:", OUTFILE)
 print("Shape:", X.shape, y.shape, "Subjects:", len(np.unique(subject_ids)))

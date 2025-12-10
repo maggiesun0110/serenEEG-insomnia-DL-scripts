@@ -121,10 +121,10 @@ def train_minimal(model, train_loader, test_loader, device,
     else:
         criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
 
     # ----- TensorBoard -----
-    run_name = f"early_stopping_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_name = f"finalized_weight_decay_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     writer = SummaryWriter(log_dir=f"runs/{run_name}")
 
     # ----- Early stopping state -----
