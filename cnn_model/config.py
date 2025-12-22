@@ -1,0 +1,5 @@
+MODEL_CHECKPOINT = "checkpoints/sereneeg_cnn_v1.pth"
+DECISION_THRESHOLD = 0.82
+
+POSITIVE_CLASS = 0
+NEGATIVE_CLASS = 1  
