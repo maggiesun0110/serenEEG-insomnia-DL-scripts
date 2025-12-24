@@ -9,3 +9,4 @@ joblib
 h5py
 tensorboard
 datetime
+shap
