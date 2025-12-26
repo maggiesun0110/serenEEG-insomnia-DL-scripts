@@ -10,3 +10,4 @@ h5py
 tensorboard
 datetime
 shap
+datalad
