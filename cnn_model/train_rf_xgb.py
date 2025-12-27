@@ -5,6 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import xgboost as xgb
+from sklearn.metrics import classification_report
 
 # =====================
 # Paths
@@ -85,6 +86,22 @@ def report(name, preds):
 
 report("Random Forest", rf_preds)
 report("XGBoost", xgb_preds)
+
+print("\n=== Random Forest: per-class metrics (LOSO) ===")
+print(classification_report(
+    y_true,
+    rf_preds,
+    target_names=["Healthy (0)", "Insomnia (1)"],
+    digits=4
+))
+
+print("\n=== XGBoost: per-class metrics (LOSO) ===")
+print(classification_report(
+    y_true,
+    xgb_preds,
+    target_names=["Healthy (0)", "Insomnia (1)"],
+    digits=4
+))
 
 # =====================
 # Train final models
