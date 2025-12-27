@@ -11,3 +11,4 @@ tensorboard
 datetime
 shap
 datalad
+xgboost
