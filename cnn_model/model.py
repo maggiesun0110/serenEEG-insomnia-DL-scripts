@@ -47,7 +47,7 @@ class BaseEEGCNN(nn.Module):
         x = self.global_avg(x)
         x = x.squeeze(-1)
 
-        x = self.relu(self.fc1(x))   # 🔹 64-D embedding
+        x = self.relu(self.fc1(x))   # 64-D embedding
         return x
 
     def forward(self, x):
