@@ -51,7 +51,6 @@ def subject_majority_vote(probs, subject_ids, threshold=0.5):
         pred_epochs = (p >= threshold).astype(int)
         pred_subj = int(np.mean(pred_epochs) >= 0.5)  # majority
         subj_preds[s] = pred_subj
-        # assume all epochs for subject share same label:
         subj_true[s] = int(np.round(np.mean(y[idx])))
 
     y_true_subj = np.array([subj_true[s] for s in subjects])
@@ -131,14 +130,11 @@ else:
 # ----------------------------
 # Metrics (subject-level)
 # ----------------------------
-# NOTE: EESM19 is healthy only, so subject-level metrics will be trivial unless you mix insomnia subjects too.
 subjects = np.unique(subject_ids)
 print("\n=== Subject-level (majority vote) ===")
 print("Subjects:", len(subjects))
 
 # If y contains only 1s, accuracy is still computable but precision/recall for other class is undefined.
-# We'll still print the confusion matrix for sanity.
-# (If you later combine with insomnia subjects, this becomes very meaningful.)
 subj_pred = {}
 subj_true = {}
 for s in subjects:

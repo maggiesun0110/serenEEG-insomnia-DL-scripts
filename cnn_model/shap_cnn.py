@@ -71,11 +71,11 @@ print("Raw SHAP shape:", shap_vals.shape)
 # -----------------------------
 # Common cases:
 # A) (samples, channels, time)
-# B) (channels, time, 1) or (channels, time)  <-- your case
+# B) (channels, time, 1) or (channels, time) 
 # C) (samples, channels, time, 1)
 
 if shap_vals.ndim == 4:
-    # (samples, channels, time, outputs) -> drop outputs
+    # (samples, channels, time, outputs)
     if shap_vals.shape[-1] == 1:
         shap_vals = shap_vals[..., 0]
     # now (samples, channels, time)
@@ -122,7 +122,7 @@ for ch, val in zip(channel_names, channel_importance):
     print(f"{ch}: {val:.6f}")
 
 # -----------------------------
-# Bar plot (paper-friendly)
+# Bar plot 
 # -----------------------------
 plt.figure(figsize=(6, 4))
 plt.bar(channel_names, channel_importance)

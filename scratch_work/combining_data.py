@@ -20,7 +20,7 @@ subject_ids_list = []
 
 for name, path in datasets.items():
     if not os.path.exists(path):
-        print(f"❌ Missing dataset file: {path}")
+        print(f"Missing dataset file: {path}")
         continue
 
     data = np.load(path)

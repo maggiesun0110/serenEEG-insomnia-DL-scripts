@@ -28,10 +28,10 @@ class EEGDataset(Dataset):
         sid = self.subject_ids[idx]
 
         # Convert to tensors
-        X = torch.tensor(X, dtype=torch.float32)  # shape: (3, n_samples)
+        X = torch.tensor(X, dtype=torch.float32)
         y = torch.tensor(y, dtype=torch.long)
 
         if self.transform:
             X = self.transform(X)
 
-        return X, y, sid   # return subject_id too for per-subject eval if needed
+        return X, y, sid 

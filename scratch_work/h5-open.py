@@ -22,7 +22,6 @@ def load_combined_raw(npz_path):
     # If any key is missing, maybe it's stored inside a dict
     missing_keys = [k for k in keys_to_find if k not in loaded]
     if missing_keys:
-        # Try checking if there is only one item which is a dict
         if len(data.files) == 1:
             first_key = data.files[0]
             possible_dict = data[first_key].item() if hasattr(data[first_key], "item") else None
@@ -40,7 +39,7 @@ def load_combined_raw(npz_path):
 
 
 if __name__ == "__main__":
-    npz_file = "../dl_ins_results/combined_raw.npz"  # replace with your path
+    npz_file = "../dl_ins_results/combined_raw.npz" 
     raw_X, labels, subject_ids = load_combined_raw(npz_file)
     print("Data loaded successfully!")
     print(f"raw_X shape: {raw_X.shape}")

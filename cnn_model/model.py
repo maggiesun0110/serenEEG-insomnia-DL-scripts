@@ -25,19 +25,6 @@ class BaseEEGCNN(nn.Module):
         self.fc2 = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
-
-
-    # def forward(self, x):
-    #     x = self.pool1(self.relu(self.bn1(self.conv1(x))))
-    #     x = self.pool2(self.relu(self.bn2(self.conv2(x))))
-    #     x = self.pool3(self.relu(self.bn3(self.conv3(x))))
-
-    #     x = self.global_avg(x)
-    #     x = x.squeeze(-1)
-
-    #     x = self.dropout(self.relu(self.fc1(x)))
-    #     x = self.fc2(x)
-    #     return x
     
     def forward_features(self, x):
         x = self.pool1(self.relu(self.bn1(self.conv1(x))))
